@@ -1,5 +1,27 @@
 # Camputers Lynx para MiSTer
 
+> **Versión para la Chameleon96.** Este repositorio es
+> [Lynx_MiSTer](https://github.com/shaeon/Lynx_MiSTer) compilado para la
+> **Chameleon96** de Arrow (Cyclone V SoC 5CSEBA6U19I7, 512 MB) con MiSTer. El
+> core es el mismo; solo cambian los ficheros de la placa:
+>
+> - `ch96_top.sv`, `Lynx_ch96.qpf/.qsf/.sdc`, `sys/pins_ch96.tcl`,
+>   `sys/hps_ch96.tcl`, `sys/pll_q22.qip` y pequeños cambios en `sys/` (reloj de
+>   50 MHz desde el HPS, HDMI a 74,25 MHz, búfer de vídeo en 0x1E800000), los
+>   mismos del port a la Chameleon96 de TS2068_MiSTer.
+> - La cinta va a la DDR3 en 0x1BC00000 (8 MB), dentro de los 512 MB
+>   (`TAPE_DDR_BASE` / `TAPE_DDR_SIZE` en `Lynx_ch96.qsf`).
+> - La placa no tiene entrada de audio, así que las cintas se cargan solo desde
+>   ficheros `.tap`, `.tzx` o `.wav`.
+> - El RBF se llama `Lynx_aaaammdd_ch96.rbf`, para que no se mezcle con el de la
+>   DE10-Nano. Se compila con la revisión `Lynx_ch96` (`build.bat`, o GitHub
+>   Actions en cada push).
+>
+> Para ponerlo al día con los cambios de Lynx_MiSTer:
+> `git pull https://github.com/shaeon/Lynx_MiSTer main`. La revisión de la
+> DE10-Nano (`Lynx.qsf`) se deja solo para que esos merges sean sencillos; con
+> este `sys/` no compila.
+
 Core de MiSTer del **Camputers Lynx** (1983) que junta en uno solo los dos
 cores del Lynx de **Kyp**. El modelo se elige en el OSD:
 
@@ -138,11 +160,11 @@ Otras piezas:
 ## Compilación
 
 ```
-git clone --recursive https://github.com/shaeon/Lynx_MiSTer.git
+git clone --recursive https://github.com/shaeon/Lynx_MiSTer_ch96.git
 ```
 
 (Hace falta `--recursive`: los cores de Kyp traen el T80 como submódulo anidado.)
-Abre `Lynx.qpf` con Quartus 17.0 y compila, o ejecuta `build.bat`, que deja el
+Abre `Lynx_ch96.qpf` con Quartus 17.0 y compila, o ejecuta `build.bat`, que deja el
 RBF en `releases/`.
 
 GitHub Actions (`.github/workflows/build.yml`) compila el core en cada `push`

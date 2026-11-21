@@ -1,6 +1,6 @@
-# Compila el core de MiSTer en GitHub con Quartus 17.0 (imagen Docker
-# raetro/quartus:17.0, la version que usa MiSTer) y deja como resultado el .rbf
-# y los informes. Al subir una etiqueta v* (por ejemplo v1.0) crea ademas una
+# Compila el core para la Chameleon96 (revision Lynx_ch96) en GitHub con Quartus
+# 17.0 (imagen Docker raetro/quartus:17.0, la version que usa MiSTer) y deja como
+# resultado Lynx_aaaammdd_ch96.rbf y los informes. Al subir una etiqueta v* (por ejemplo v1.0) crea ademas una
 # Release con el .rbf.
 #
 # - push / pull request: compila y sube el resultado (pestana Actions).
@@ -54,14 +54,14 @@ jobs:
       - name: Compilar
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/build -w /build raetro/quartus:17.0 \
-            quartus_sh --flow compile Lynx
+            quartus_sh --flow compile Lynx_ch96
 
       # Resumen de tiempos en la pagina de la ejecucion; aviso si alguna
       # holgura es negativa (no para la compilacion: el .rbf sale igual)
       - name: Resumen de tiempos
         if: always()
         run: |
-          STA=output_files/Lynx.sta.rpt
+          STA=output_files/Lynx_ch96.sta.rpt
           [ -f "$STA" ] || { echo "No hay informe de tiempos" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
           {
             echo "## Tiempos (modelo lento)"
@@ -73,7 +73,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if sed -n '/Setup Summary/,/Removal Summary/p' "$STA" | grep -qE ';[[:space:]]*-[0-9]+\.[0-9]+[[:space:]]*;'; then
-            echo "::warning title=Tiempos::Hay holguras negativas: revisa Lynx.sta.rpt"
+            echo "::warning title=Tiempos::Hay holguras negativas: revisa Lynx_ch96.sta.rpt"
           fi
 
       - name: Preparar el resultado
@@ -81,9 +81,9 @@ jobs:
         run: |
           mkdir -p dist
           DATE=$(date -u +%Y%m%d)
-          [ -f output_files/Lynx.rbf ] && cp output_files/Lynx.rbf "dist/Lynx_${DATE}.rbf"
+          [ -f output_files/Lynx_ch96.rbf ] && cp output_files/Lynx_ch96.rbf "dist/Lynx_${DATE}_ch96.rbf"
           for r in map fit sta flow asm; do
-            [ -f output_files/Lynx.$r.rpt ] && cp output_files/Lynx.$r.rpt dist/
+            [ -f output_files/Lynx_ch96.$r.rpt ] && cp output_files/Lynx_ch96.$r.rpt dist/
           done
           ls -la dist
 
@@ -91,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Lynx-${{ github.sha }}
+          name: Lynx_ch96-${{ github.sha }}
           path: dist/
           retention-days: 30
 
@@ -99,5 +99,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Lynx_*.rbf
+          files: dist/Lynx_*_ch96.rbf
           generate_release_notes: true
