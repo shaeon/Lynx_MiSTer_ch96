@@ -25,6 +25,7 @@ module sys_top
 	input         FPGA_CLK1_50,
 	input         FPGA_CLK2_50,
 	input         FPGA_CLK3_50,
+
 	output        clk_50m,
 
 	//////////// HDMI //////////
@@ -57,6 +58,21 @@ module sys_top
 	output        SDRAM_CLK,
 	output        SDRAM_CKE,
 
+	//////////// PSRAM ///////////
+	output        PSRAM_SCLK,
+	output        PSRAM_CE_N,
+	output  [3:0] PSRAM_SIO_OUT,
+	output  [3:0] PSRAM_SIO_OE,
+	input   [3:0] PSRAM_SIO_IN,
+
+	output        PSRAM2_SCLK,
+	output        PSRAM2_CE_N,
+	output  [3:0] PSRAM2_SIO_OUT,
+	output  [3:0] PSRAM2_SIO_OE,
+	input   [3:0] PSRAM2_SIO_IN,
+
+    output FAN_PWM,
+    
 `ifdef MISTER_DUAL_SDRAM
 	////////// SDR #2 //////////
 	output [12:0] SDRAM2_A,
@@ -598,6 +614,19 @@ always @(posedge FPGA_CLK2_50) begin
 	resetd2 <= resetd;
 end
 
+///////////////////////////  FAN PWM  ///////////////////////////////////
+
+reg pwm_reg = 1'b0;
+localparam [19:0] PWM_DUTY_CYCLE = 20'd524288;
+always @(posedge FPGA_CLK2_50) begin
+    reg [19:0] counter;
+    counter <= counter + 1'b1;
+    
+    if (counter > PWM_DUTY_CYCLE) pwm_reg <= 1'b1;
+    else pwm_reg <= 1'b0;
+end
+
+assign FAN_PWM = pwm_reg;
 ////////////////////  SYSTEM MEMORY & SCALER  /////////////////////////
 
 wire reset;
@@ -1183,7 +1212,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	wire [23:0] hdmi_data_osd;
 	wire        hdmi_de_osd, hdmi_vs_osd, hdmi_hs_osd;
 
-	osd hdmi_osd
+	osd #(.OSD_COLOR(1)) hdmi_osd
 	(
 		.clk_sys(clk_sys),
 
@@ -1564,6 +1593,9 @@ assign SDCD_SPDIF = (mcp_en & ~spdif) ? 1'b0 : 1'bZ;
 `ifndef MISTER_DUAL_SDRAM
 	wire analog_l, analog_r;
 
+	assign AUDIO_SPDIF = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_LRCLK : spdif;
+	assign AUDIO_R     = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_I2S   : analog_r;
+	assign AUDIO_L     = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_SCLK  : analog_l;
 `endif
 
 assign HDMI_MCLK = clk_audio;
@@ -1615,18 +1647,6 @@ audio_out audio_out
 	.spdif(spdif)
 );
 
-`ifndef MISTER_DUAL_SDRAM
-	reg aud_spdif_q, aud_r_q, aud_l_q;
-	always @(posedge clk_audio) begin
-		aud_spdif_q <= (SW[0] | mcp_en) ? HDMI_LRCLK : spdif;
-		aud_r_q     <= (SW[0] | mcp_en) ? HDMI_I2S   : analog_r;
-		aud_l_q     <= (SW[0] | mcp_en) ? HDMI_SCLK  : analog_l;
-	end
-
-	assign AUDIO_SPDIF = av_dis ? 1'bZ : aud_spdif_q;
-	assign AUDIO_R     = av_dis ? 1'bZ : aud_r_q;
-	assign AUDIO_L     = av_dis ? 1'bZ : aud_l_q;
-`endif
 
 `ifndef MISTER_DISABLE_ALSA
 	wire aspi_sck,aspi_mosi,aspi_ss,aspi_miso;
@@ -1768,6 +1788,7 @@ wire [13:0] fb_stride;
 emu emu
 (
 	.CLK_50M(FPGA_CLK2_50),
+	.CLK_100M(clk_100m),
 	.RESET(reset),
 	.HPS_BUS({f1, HDMI_TX_VS, 
 				 clk_100m, clk_ihdmi,
@@ -1792,12 +1813,6 @@ emu emu
 	.HDMI_FREEZE(freeze),
 	.HDMI_BLACKOUT(hdmi_blackout),
 	.HDMI_BOB_DEINT(bob_deint),
-
-	.LFB_FMT(LFB_FMT),
-	.LFB_BASE(LFB_BASE),
-	.LFB_WIDTH(LFB_WIDTH),
-	.LFB_HEIGHT(LFB_HEIGHT),
-	.LFB_STRIDE(LFB_STRIDE),
 
 	.CLK_VIDEO(clk_vid),
 	.CE_PIXEL(ce_pix),
@@ -1861,6 +1876,18 @@ emu emu
 	.SDRAM_CLK(SDRAM_CLK),
 	.SDRAM_CKE(SDRAM_CKE),
 
+	.PSRAM_SCLK(PSRAM_SCLK),
+	.PSRAM_CE_N(PSRAM_CE_N),
+	.PSRAM_SIO_OUT(PSRAM_SIO_OUT),
+	.PSRAM_SIO_OE(PSRAM_SIO_OE),
+	.PSRAM_SIO_IN(PSRAM_SIO_IN),
+
+	.PSRAM2_SCLK(PSRAM2_SCLK),
+	.PSRAM2_CE_N(PSRAM2_CE_N),
+	.PSRAM2_SIO_OUT(PSRAM2_SIO_OUT),
+	.PSRAM2_SIO_OE(PSRAM2_SIO_OE),
+	.PSRAM2_SIO_IN(PSRAM2_SIO_IN),
+    
 `ifdef MISTER_DUAL_SDRAM
 	.SDRAM2_DQ(SDRAM2_DQ),
 	.SDRAM2_A(SDRAM2_A),

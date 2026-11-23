@@ -37,12 +37,6 @@ output        HDMI_FREEZE,
 output        HDMI_BLACKOUT,
 output        HDMI_BOB_DEINT,
 
-input   [5:0] LFB_FMT,
-input  [31:0] LFB_BASE,
-input  [11:0] LFB_WIDTH,
-input  [11:0] LFB_HEIGHT,
-input  [13:0] LFB_STRIDE,
-
 `ifdef MISTER_FB
 // Use framebuffer in DDRAM
 // FB_FORMAT:
@@ -126,6 +120,19 @@ output        SDRAM_nCS,
 output        SDRAM_nCAS,
 output        SDRAM_nRAS,
 output        SDRAM_nWE,
+
+input         CLK_100M,
+output        PSRAM_SCLK,
+output        PSRAM_CE_N,
+output  [3:0] PSRAM_SIO_OUT,
+output  [3:0] PSRAM_SIO_OE,
+input   [3:0] PSRAM_SIO_IN,
+
+output        PSRAM2_SCLK,
+output        PSRAM2_CE_N,
+output  [3:0] PSRAM2_SIO_OUT,
+output  [3:0] PSRAM2_SIO_OE,
+input   [3:0] PSRAM2_SIO_IN,
 
 `ifdef MISTER_DUAL_SDRAM
 //Secondary SDRAM

@@ -1,12 +1,20 @@
-# Compila el core para la Chameleon96 (revision Lynx_ch96) en GitHub con Quartus
-# 17.0 (imagen Docker raetro/quartus:17.0, la version que usa MiSTer) y deja como
-# resultado Lynx_aaaammdd_ch96.rbf y los informes. Al subir una etiqueta v* (por ejemplo v1.0) crea ademas una
+# Compila el core de MiSTer en GitHub con Quartus 17.0 (imagen Docker
+# raetro/quartus:17.0, la version que usa MiSTer) y deja como resultado el .rbf
+# y los informes. Al subir una etiqueta v* (por ejemplo v1.0) crea ademas una
 # Release con el .rbf.
 #
 # - push / pull request: compila y sube el resultado (pestana Actions).
 # - push a main: ademas guarda el RBF en releases/ con un commit.
 # - Lanzar a mano: Actions > Build > Run workflow.
 # - Release: git tag v1.0 && git push origin v1.0
+# - Solo se ejecuta en shaeon/Lynx_MiSTer. El repositorio de la Chameleon96
+#   (shaeon/Lynx_MiSTer_ch96) se sincroniza con este y lleva este mismo
+#   fichero sin cambios, pero alli compila su propio workflow (build_ch96.yml).
+#
+# Node.js: GitHub ha retirado Node 20 en los runners. Todas las acciones van en
+# versiones que ya funcionan con Node 24 (checkout@v6, upload-artifact@v6,
+# action-gh-release@v3) y FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 obliga a usar
+# Node 24 con cualquier otra, para que no salga el aviso de Node 20.
 
 name: Build
 
@@ -17,18 +25,28 @@ on:
     paths-ignore:
       - '**.md'
       - 'releases/**'
+      - 'docs/**'
+      - 'sim/**'
+      - 'tools/**'
   pull_request:
     branches: [main]
     paths-ignore:
       - '**.md'
       - 'releases/**'
+      - 'docs/**'
+      - 'sim/**'
+      - 'tools/**'
   workflow_dispatch:
 
 permissions:
   contents: write          # para crear la Release en las etiquetas v*
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
+    if: github.repository == 'shaeon/Lynx_MiSTer'
     runs-on: ubuntu-latest
     timeout-minutes: 150
 
@@ -43,7 +61,7 @@ jobs:
 
       # los cores de Kyp son submodulos (rtl/lynx y rtl/lynx128, con el T80 anidado)
       - name: Descargar el repositorio con los submodulos
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -55,14 +73,27 @@ jobs:
       - name: Compilar
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/build -w /build raetro/quartus:17.0 \
-            quartus_sh --flow compile Lynx_ch96
+            quartus_sh --flow compile Lynx
+
+      # Si falla, saca los errores de Quartus como anotaciones y en el resumen
+      - name: Errores de Quartus
+        if: failure()
+        run: |
+          ERR=$(cat output_files/Lynx.*.rpt 2>/dev/null | grep -E '^(Error|Critical Warning) \(' | sort -u | head -40)
+          {
+            echo "## Errores de Quartus"
+            echo '```'
+            echo "${ERR:-No hay informes: mira el log del paso Compilar}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$ERR" | grep '^Error' | head -10 | while read -r l; do echo "::error title=Quartus::$l"; done
 
       # Resumen de tiempos en la pagina de la ejecucion; aviso si alguna
       # holgura es negativa (no para la compilacion: el .rbf sale igual)
       - name: Resumen de tiempos
         if: always()
         run: |
-          STA=output_files/Lynx_ch96.sta.rpt
+          STA=output_files/Lynx.sta.rpt
           [ -f "$STA" ] || { echo "No hay informe de tiempos" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
           {
             echo "## Tiempos (modelo lento)"
@@ -74,7 +105,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if sed -n '/Setup Summary/,/Removal Summary/p' "$STA" | grep -qE ';[[:space:]]*-[0-9]+\.[0-9]+[[:space:]]*;'; then
-            echo "::warning title=Tiempos::Hay holguras negativas: revisa Lynx_ch96.sta.rpt"
+            echo "::warning title=Tiempos::Hay holguras negativas: revisa Lynx.sta.rpt"
           fi
 
       - name: Preparar el resultado
@@ -82,17 +113,17 @@ jobs:
         run: |
           mkdir -p dist
           DATE=$(date -u +%Y%m%d)
-          [ -f output_files/Lynx_ch96.rbf ] && cp output_files/Lynx_ch96.rbf "dist/Lynx_${DATE}_ch96.rbf"
+          [ -f output_files/Lynx.rbf ] && cp output_files/Lynx.rbf "dist/Lynx_${DATE}.rbf"
           for r in map fit sta flow asm; do
-            [ -f output_files/Lynx_ch96.$r.rpt ] && cp output_files/Lynx_ch96.$r.rpt dist/
+            [ -f output_files/Lynx.$r.rpt ] && cp output_files/Lynx.$r.rpt dist/
           done
           ls -la dist
 
       - name: Subir el resultado
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: Lynx_ch96-${{ github.sha }}
+          name: Lynx-${{ github.sha }}
           path: dist/
           retention-days: 30
 
@@ -100,16 +131,16 @@ jobs:
       # a nombre del autor del repo. Ese commit solo toca releases/, que esta en
       # paths-ignore, asi que no vuelve a lanzar la compilacion.
       - name: Guardar el RBF en releases/
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          ls dist/Lynx_*_ch96.rbf >/dev/null 2>&1 || { echo "No hay RBF"; exit 1; }
+          ls dist/Lynx_*.rbf >/dev/null 2>&1 || { echo "No hay RBF"; exit 1; }
           mkdir -p releases
-          cp dist/Lynx_*_ch96.rbf releases/
+          cp dist/Lynx_*.rbf releases/
           git config user.name  "Shaeon (Carlos Palmero)"
           git config user.email "shaeon@users.noreply.github.com"
           git add releases/
           if git diff --cached --quiet; then echo "El RBF ya estaba"; exit 0; fi
-          git commit -m "releases: $(ls dist/Lynx_*_ch96.rbf | xargs -n1 basename)"
+          git commit -m "releases: $(ls dist/Lynx_*.rbf | xargs -n1 basename)"
           for i in 1 2 3; do
             git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
             sleep 5
@@ -118,7 +149,7 @@ jobs:
 
       - name: Crear la Release (etiquetas v*)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          files: dist/Lynx_*_ch96.rbf
+          files: dist/Lynx_*.rbf
           generate_release_notes: true
