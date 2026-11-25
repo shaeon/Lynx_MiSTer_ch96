@@ -73,7 +73,7 @@ disks start with `EXT BOOT`. As in Kyp's cores, every model has the disk
 interface.
 
 **Keyboard**: the PC keys sit where the Lynx keys are. Caps Lock = SHIFT LOCK,
-Esc = ESCAPE (also BREAK), Backspace = DELETE, End = the key MAME maps to
+Esc = ESCAPE, Scroll Lock = BREAK, Backspace = DELETE, End = the key MAME maps to
 End. **Joysticks**: ports 0x7A and 0x7B, one fire button.
 
 ## How it works
@@ -95,29 +95,30 @@ tape, the keyboard, audio and video. Everything is in block RAM: ROMs (64K +
 - `lynx48.v` and `lynx128.v`: `lynx.v` + `video.v` of each core with the
   modules renamed (both repositories have modules called `lynx` and `video`
   with different contents, which Quartus does not allow);
-- `matrix.v`: the keyboard;
+- `matrix.v`: the keyboard (the one in `rtl/lynx`);
 
-applying the fixes in `tools/kyp_fixes.py` (written out to `rtl/kyp_fixes.tcl`):
+applying the fixes listed in `tools/kyp_fixes.py` (written out to
+`rtl/kyp_fixes.tcl`). The list is empty now: Kyp has taken into his cores
+(Kyp069/lynx dd9bdce, Kyp069/lynx128 55ecc58) the fixes alanswx found in
+Lynx48_MiSTer, sent to him as pull requests from the forks
+[shaeon/lynx](https://github.com/shaeon/lynx) and
+[shaeon/lynx128](https://github.com/shaeon/lynx128):
 
 | Fix | 48K/96K | 128K |
 |---|---|---|
-| Port 58h written only on write cycles | ✓ | |
+| Port 58h written only on write cycles | ✓ | ✓ |
 | 6845 readable at 86h/87h (as MAME) | ✓ | ✓ |
 | Video RAM writes need the bank's /CASEN (schematic IC41) | ✓ | |
 | Tape bit of port 80h while the 6845's MA13 is high (Jynx, schematic), not the motor bit: fixes Level 9 | ✓ | |
 | 48K: ROM space 0000-5FFF (empty socket reads FF) | ✓ | |
-| ESC raises /INT (BREAK, as MAME) | ✓ | ✓ |
-| `de` (6845 display enable) and `motor` outputs | ✓ | ✓ |
-| Keyboard: `esc` output, End, right Ctrl, keypad Enter | ✓ | ✓ |
+| `break` input: /INT (BREAK, as MAME), Scroll Lock | ✓ | ✓ |
+| `blank` (6845 display enable) and `motor` outputs | ✓ | ✓ |
+| Keyboard: End, right Ctrl, keypad Enter | ✓ | ✓ |
 
-They are the fixes found by alanswx in Lynx48_MiSTer. The same changes are
-offered to Kyp as pull requests from the forks
-[shaeon/lynx](https://github.com/shaeon/lynx) and
-[shaeon/lynx128](https://github.com/shaeon/lynx128). A fix that is already in
-the submodule is skipped, so they can be removed from `tools/kyp_fixes.py` as
-Kyp accepts them; if a change of Kyp's breaks one, the build stops with an
-error instead of building something different. After editing
-`tools/kyp_fixes.py`, run `python3 tools/kyp_fixes.py tcl`.
+The mechanism stays for future fixes: a fix that is already in the submodule
+is skipped, and if a change of Kyp's breaks one, the build stops with an error
+instead of building something different. After editing `tools/kyp_fixes.py`,
+run `python3 tools/kyp_fixes.py tcl`.
 
 Other parts:
 

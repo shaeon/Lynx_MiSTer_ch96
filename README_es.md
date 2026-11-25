@@ -73,7 +73,7 @@ los discos CP/M arrancan con `EXT BOOT`. Como en los cores de Kyp, todos los
 modelos tienen la disquetera.
 
 **Teclado**: las teclas del PC están donde las del Lynx. Bloq Mayús = SHIFT
-LOCK, Esc = ESCAPE (y BREAK), Retroceso = DELETE, Fin = la tecla que MAME pone
+LOCK, Esc = ESCAPE, Bloq Despl = BREAK, Retroceso = DELETE, Fin = la tecla que MAME pone
 en Fin. **Joysticks**: puertos 0x7A y 0x7B, un botón de disparo.
 
 ## Cómo funciona
@@ -96,28 +96,28 @@ ROMs (64K + 32K), RAM (64K + el banco 4 del 128K) y memoria de vídeo.
 - `lynx48.v` y `lynx128.v`: `lynx.v` + `video.v` de cada core con los módulos
   renombrados (los dos repositorios tienen módulos `lynx` y `video` distintos
   con el mismo nombre, y Quartus no lo admite);
-- `matrix.v`: el teclado;
+- `matrix.v`: el teclado (el de `rtl/lynx`);
 
-aplicando las correcciones de `tools/kyp_fixes.py` (que se vuelcan en
-`rtl/kyp_fixes.tcl`):
+aplicando las correcciones que haya en `tools/kyp_fixes.py` (que se vuelcan en
+`rtl/kyp_fixes.tcl`). Ahora la lista está vacía: Kyp ha metido en sus cores
+(Kyp069/lynx dd9bdce, Kyp069/lynx128 55ecc58) las correcciones que encontró
+alanswx en Lynx48_MiSTer, que le mandamos como pull requests desde los forks
+[shaeon/lynx](https://github.com/shaeon/lynx) y
+[shaeon/lynx128](https://github.com/shaeon/lynx128):
 
 | Corrección | 48K/96K | 128K |
 |---|---|---|
-| El puerto 58h solo se escribe en ciclos de escritura | ✓ | |
+| El puerto 58h solo se escribe en ciclos de escritura | ✓ | ✓ |
 | 6845 legible en 86h/87h (como en MAME) | ✓ | ✓ |
 | Escritura en la memoria de vídeo solo con /CASEN del banco (esquema, IC41) | ✓ | |
 | Bit de cinta del puerto 80h con MA13 del 6845 (Jynx, esquema) y no con el del motor: arregla los Level 9 | ✓ | |
 | 48K: ROM en 0000-5FFF (el zócalo vacío lee FF) | ✓ | |
-| ESC genera /INT (BREAK, como en MAME) | ✓ | ✓ |
-| Salidas `de` (display enable del 6845) y `motor` | ✓ | ✓ |
-| Teclado: salida `esc`, Fin, Ctrl derecho y Enter del teclado numérico | ✓ | ✓ |
+| Entrada `break`: /INT (BREAK, como en MAME), con Bloq Despl | ✓ | ✓ |
+| Salidas `blank` (display enable del 6845) y `motor` | ✓ | ✓ |
+| Teclado: Fin, Ctrl derecho y Enter del teclado numérico | ✓ | ✓ |
 
-Son las correcciones que encontró alanswx en Lynx48_MiSTer. Los mismos cambios
-se le proponen a Kyp como pull requests desde los forks
-[shaeon/lynx](https://github.com/shaeon/lynx) y
-[shaeon/lynx128](https://github.com/shaeon/lynx128). Una corrección que ya está
-en el submódulo se salta, así que se pueden ir quitando de `tools/kyp_fixes.py`
-según Kyp las acepte; si un cambio de Kyp rompe alguna, la compilación se para
+El mecanismo se queda para correcciones futuras: una que ya esté en el
+submódulo se salta, y si un cambio de Kyp rompe alguna, la compilación se para
 con un error en vez de generar algo distinto. Después de tocar
 `tools/kyp_fixes.py`, ejecuta `python3 tools/kyp_fixes.py tcl`.
 

@@ -112,6 +112,14 @@ wire [127:0] status;
 wire  [21:0] gamma_bus;
 wire  [10:0] ps2_key;
 wire         ps2kCk, ps2kD;
+
+// ESC held (scancode 76h without E0), for the hiss that lets a waiting LOAD be broken
+reg          esc_held = 0;
+reg          ps2_key_d = 0;
+always @(posedge clk_sys) begin
+	ps2_key_d <= ps2_key[10];
+	if(ps2_key[10] != ps2_key_d && !ps2_key[8] && ps2_key[7:0] == 8'h76) esc_held <= ps2_key[9];
+end
 wire  [31:0] joystick_0, joystick_1;
 
 wire         ioctl_download;
@@ -401,6 +409,7 @@ lynx_core lynx_core
 
 	.ps2kCk      (ps2kCk           ),
 	.ps2kD       (ps2kD            ),
+	.esc         (esc_held         ),
 	.joy0        (joy0             ),
 	.joy1        (joy1             ),
 	.key_F9      (key_F9           ),

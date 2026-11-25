@@ -36,6 +36,7 @@ module lynx_core
 	// keyboard (PS/2 from hps_io) / joysticks
 	input  wire        ps2kCk,
 	input  wire        ps2kD,
+	input  wire        esc,            // ESC held (from hps_io's ps2_key), for the hiss below
 	input  wire [ 7:0] joy0,           // active low { -, -, fire, -, right, left, down, up }
 	input  wire [ 7:0] joy1,
 	output wire        key_F9,         // active low
@@ -121,7 +122,7 @@ module lynx_core
 	wire [3:0] row48, row128;
 	wire [3:0] row = m128 ? row128 : row48;
 	wire [7:0] col;
-	wire       esc;
+	wire       brk_n;                   // BREAK (Scroll Lock) from matrix.v, active low
 
 	wire       strb;
 	wire [7:0] code;
@@ -138,7 +139,7 @@ module lynx_core
 		.F9     (key_F9  ),
 		.play   (key_play),
 		.stop   (key_stop),
-		.esc    (esc     )
+		.\break (brk_n   )    // break is a SystemVerilog keyword
 	);
 
 //--- ROMs ----------------------------------------------------------------------------------------
@@ -228,10 +229,11 @@ module lynx_core
 //--- ESC during LOAD ------------------------------------------------------------------------------
 // The ROM looks at ESC only between edges of the tape signal; a real cassette always gives it hiss,
 // but a silent input (no tape, the end of the image, WAV silence) would leave LOAD waiting for
-// ever. While the motor runs and ESC is held, a 2 kHz square wave stands in for the hiss.
+// ever. While the motor runs and ESC (or BREAK, Scroll Lock) is held, a 1.46 kHz square wave
+// stands in for the hiss.
 	reg [14:0] hiss = 15'd0;
 	always @(posedge clock) hiss <= hiss + 1'd1;      // bit 14: 48 MHz / 2^15 = 1.46 kHz
-	wire tape_q = esc && motor ? hiss[14] : tape_in;
+	wire tape_q = (esc || !brk_n) && motor ? hiss[14] : tape_in;
 
 //--- floppy (WD1793, shared) ---------------------------------------------------------------------
 
@@ -328,14 +330,14 @@ module lynx_core
 	vram #(16) vram2(clock, mem2A1, mem2Q1, mem2A2, mem2D2, mem2Q2, mem2W2);
 	vram #(16) vram3(clock, mem3A1, mem3Q1, mem3A2, mem3D2, mem3Q2, mem3W2);
 
-	wire       de48, hs48, vs48, r48, g48, b48, motor48;
+	wire       blank48, hs48, vs48, r48, g48, b48, motor48;
 	wire [5:0] sound48;
 
 	lynx48 lynx48
 	(
 		.ramM   (ramM     ),
 		.casM   (casM     ),
-		.brk    (esc      ),
+		.\break (brk_n    ),
 		.clock  (clock    ),
 		.pe06M  (pe06M    ),
 		.peM75  (peM75    ),
@@ -343,7 +345,7 @@ module lynx_core
 		.pe04M  (pe04M    ),
 		.reset  (reset48  ),
 		.rfsh   (         ),
-		.de     (de48     ),
+		.blank  (blank48  ),
 		.motor  (motor48  ),
 		.hSync  (hs48     ),
 		.vSync  (vs48     ),
@@ -393,7 +395,7 @@ module lynx_core
 
 	vram #(64) vram128(clock, vramA1, vramQ1, vramA2, vramD2, vramQ2, vramW2);
 
-	wire       de128, hs128, vs128, r128, g128, b128, motor128;
+	wire       blank128, hs128, vs128, r128, g128, b128, motor128;
 	wire [5:0] sound128;
 
 	lynx128 lynx128
@@ -403,10 +405,10 @@ module lynx_core
 		.ne6M0  (ne6M0     ),
 		.pe6M0  (pe6M0     ),
 		.pe1M5  (pe1M5     ),
-		.brk    (esc       ),
+		.\break (brk_n     ),
 		.reset  (reset128  ),
 		.rfsh   (          ),
-		.de     (de128     ),
+		.blank  (blank128  ),
 		.motor  (motor128  ),
 		.hsync  (hs128     ),
 		.vsync  (vs128     ),
@@ -461,7 +463,7 @@ module lynx_core
 	wire       cePixel = m128 ? pe12M : pe06M;
 	wire       hsync   = m128 ? hs128 : hs48;
 	wire       vsync   = m128 ? vs128 : vs48;
-	wire       de      = m128 ? de128 : de48;
+	wire       de      = m128 ? !blank128 : !blank48;   // blank = !DE of the 6845
 	wire [2:0] rgb     = m128 ? { r128, g128, b128 } : { r48, g48, b48 };
 
 	reg [7:0] deDly = 8'd0;
