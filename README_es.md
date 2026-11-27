@@ -70,7 +70,10 @@ La cinta se mueve mientras el Lynx tiene el motor encendido. ESC corta un
 
 **Disco**: `XROM`, luego `EXT DIR`, `EXT LOAD "NOMBRE"`, `EXT MLOAD "NOMBRE"`;
 los discos CP/M arrancan con `EXT BOOT`. Como en los cores de Kyp, todos los
-modelos tienen la disquetera.
+modelos tienen la disquetera. Valen los dos tamaños de LDF de la lista
+`camplynx_flop` de MAME: 200K (40 pistas, una cara) y 800K (80 pistas, dos
+caras). CP/M solo salió para el 128K; para CP/M en el 96K, ver
+[Lynx96_CPM](https://github.com/shaeon/Lynx96_CPM).
 
 **Teclado**: las teclas del PC están donde las del Lynx. Bloq Mayús = SHIFT
 LOCK, Esc = ESCAPE, Bloq Despl = BREAK, Retroceso = DELETE, Fin = la tecla que MAME pone

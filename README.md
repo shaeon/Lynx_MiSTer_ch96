@@ -70,7 +70,10 @@ is waiting.
 
 **Disk**: `XROM`, then `EXT DIR`, `EXT LOAD "NAME"`, `EXT MLOAD "NAME"`; CP/M
 disks start with `EXT BOOT`. As in Kyp's cores, every model has the disk
-interface.
+interface. Both LDF sizes of MAME's `camplynx_flop` list work: 200K (40 tracks,
+single sided) and 800K (80 tracks, double sided). CP/M was only released for
+the 128K; for CP/M on the 96K see
+[Lynx96_CPM](https://github.com/shaeon/Lynx96_CPM).
 
 **Keyboard**: the PC keys sit where the Lynx keys are. Caps Lock = SHIFT LOCK,
 Esc = ESCAPE, Scroll Lock = BREAK, Backspace = DELETE, End = the key MAME maps to

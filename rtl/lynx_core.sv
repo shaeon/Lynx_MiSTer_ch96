@@ -297,7 +297,9 @@ module lynx_core
 		.busy               (fdc_busy                 ),
 		.wp                 (img_readonly             ),
 		.size_code          (3'd4                     ),
-		.layout             (1'b1                     ),
+		.layout             (img_size < 64'd409600    ),   // LDF (MAME camplynx_dsk): 200K = 40 tracks single sided
+		                                                   // (1: side 0 only, LBA = track * 10); 800K = 80 tracks double
+		                                                   // sided, stored track 0 side 0, track 0 side 1, ... (0)
 		.side               (m128 ? fdcSide128 : fdcSide48),
 		.ready              (fdcSel && fdcDisk        ),
 		.img_mounted        (img_mounted              ),
