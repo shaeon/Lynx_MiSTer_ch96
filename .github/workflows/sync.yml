@@ -1,14 +1,23 @@
-# Mantiene este repositorio al dia con shaeon/Lynx_MiSTer (rama main).
+# Mantiene este repositorio al dia con shaeon/Lynx_MiSTer (rama main) y con
+# los submodulos (los cores de Kyp: rtl/lynx y rtl/lynx128).
 #
 # Cada noche (o a mano: Actions > Sync > Run workflow):
 #   1. Trae upstream/main y lo mezcla con main.
-#   2. Los conflictos en releases/ se resuelven solos quitando el fichero.
-#      Cualquier otro conflicto (por ejemplo en sys/ si cambia el framework
-#      de MiSTer) para el workflow y se avisa en el resumen: hay que
-#      resolverlo a mano.
+#      - Los conflictos en releases/ se resuelven solos quitando el fichero.
+#      - Los conflictos en un submodulo se resuelven solos con el commit de
+#        upstream (en el paso 2 se sube de todas formas al ultimo).
+#      - Cualquier otro conflicto (por ejemplo en sys/ si cambia el framework
+#        de MiSTer) para el workflow y se avisa en el resumen: hay que
+#        resolverlo a mano. No se compila ni se publica nada.
+#   2. Sube cada submodulo al ultimo commit de su rama en su repositorio
+#      (git submodule update --remote) y sus submodulos anidados (el T80) a lo
+#      que fije ese commit.
 #   3. Quita de releases/ todo RBF que no termine en _ch96.rbf (los de la
 #      DE10-Nano no deben llegar al actualizador de la Chameleon96).
-#   4. Sube el resultado y lanza build_ch96.yml.
+#   4. Si algo ha cambiado (1 o 2), sube el resultado y lanza build_ch96.yml.
+#      build_ch96.yml solo guarda el RBF nuevo en releases/ si compila bien, y
+#      el actualizador de la Chameleon96 lo recoge de ahi. Si no compila, no se
+#      publica nada y el error sale en Actions.
 #
 # Un push hecho con GITHUB_TOKEN no lanza otros workflows; por eso se lanza
 # la compilacion con "gh workflow run" (workflow_dispatch si funciona).
@@ -53,24 +62,27 @@ jobs:
           git fetch --quiet upstream main
 
           if git merge-base --is-ancestor upstream/main HEAD; then
-            echo "Ya esta al dia con $(git rev-parse --short upstream/main)" | tee -a "$GITHUB_STEP_SUMMARY"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Ya esta al dia con upstream $(git rev-parse --short upstream/main)" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git merge --no-ff --no-commit upstream/main || true
 
-          # conflictos en releases/: fuera
-          # (los run de GitHub van con bash -eo pipefail: grep sin coincidencias no debe parar)
-          git diff --name-only --diff-filter=U | { grep '^releases/' || true; } | while read -r f; do
-            git rm -q -f -- "$f"
+          git diff --name-only --diff-filter=U | while read -r f; do
+            if [ "$(git ls-tree upstream/main -- "$f" | awk '{print $1}')" = 160000 ]; then
+              # submodulo: el commit de upstream (el paso siguiente lo sube al ultimo)
+              git update-index --cacheinfo "160000,$(git rev-parse "upstream/main:$f"),$f"
+            elif [ "${f#releases/}" != "$f" ]; then
+              git rm -q -f -- "$f"
+            fi
           done
 
           LEFT=$(git diff --name-only --diff-filter=U)
           if [ -n "$LEFT" ]; then
             {
               echo "## Conflictos al sincronizar con upstream/main"
-              echo "Hay que resolverlos a mano:"
+              echo "Hay que resolverlos a mano. No se compila ni se publica nada."
               echo '```'
               echo "$LEFT"
               echo '```'
@@ -79,6 +91,52 @@ jobs:
             exit 1
           fi
 
+          git commit -q -m "Sincronizar con shaeon/Lynx_MiSTer ($(git rev-parse --short upstream/main))"
+          {
+            echo "## Sincronizado con upstream/main $(git rev-parse --short upstream/main)"
+            echo '```'
+            git log --oneline HEAD^1..HEAD^2 | head -30
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      - name: Actualizar los submodulos
+        id: subs
+        run: |
+          PATHS=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+          git submodule update --init --recursive --quiet
+          for p in $PATHS; do echo "$p $(git -C "$p" rev-parse HEAD)"; done > /tmp/subs_old.txt
+          # solo el primer nivel sigue su rama; los anidados (T80) van a lo que fije su padre
+          git submodule update --remote --quiet
+          git add $PATHS        # antes que lo siguiente: si no, vuelve al commit fijado
+          git submodule update --init --recursive --quiet
+
+          if git diff --cached --quiet; then
+            echo "Submodulos al dia" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MSG="Submodulos:"
+          echo "## Submodulos actualizados" >> "$GITHUB_STEP_SUMMARY"
+          while read -r p old; do
+            new=$(git -C "$p" rev-parse HEAD)
+            [ "$old" = "$new" ] && continue
+            MSG="$MSG $p ${new:0:7}"
+            {
+              echo "### $p: ${old:0:7} -> ${new:0:7}"
+              echo '```'
+              git -C "$p" log --oneline "$old..$new" | head -20
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < /tmp/subs_old.txt
+          git commit -q -m "$MSG"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Subir
+        id: push
+        if: steps.sync.outputs.merged == 'true' || steps.subs.outputs.changed == 'true'
+        run: |
           # solo RBF de la Chameleon96 en releases/
           for f in releases/*.rbf; do
             [ -e "$f" ] || continue
@@ -87,19 +145,11 @@ jobs:
               *) git rm -q -f -- "$f" ;;
             esac
           done
-
-          git commit -q -m "Sincronizar con shaeon/Lynx_MiSTer ($(git rev-parse --short upstream/main))"
+          git diff --cached --quiet || git commit -q -m "releases: solo los RBF de la Chameleon96"
           git push origin HEAD:main
-          {
-            echo "## Sincronizado con upstream/main $(git rev-parse --short upstream/main)"
-            echo '```'
-            git log --oneline HEAD^1..HEAD^2 | head -30
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Lanzar la compilacion
-        if: steps.sync.outputs.changed == 'true'
+        if: steps.push.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         # -R: con el remoto "upstream" anadido arriba, gh toma shaeon/Lynx_MiSTer como repositorio

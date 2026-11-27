@@ -64,10 +64,16 @@ Lo propio del Lynx:
 `.github/workflows/sync.yml` se ejecuta cada noche (03:23 UTC) y se puede
 lanzar a mano desde *Actions > Sync > Run workflow*:
 
-1. Trae `main` de shaeon/Lynx_MiSTer y lo mezcla con `main`.
-2. Los conflictos en `releases/` se resuelven solos quitando el fichero.
+1. Trae `main` de shaeon/Lynx_MiSTer y lo mezcla con `main`. Los conflictos
+   en `releases/` se resuelven solos quitando el fichero, y los de un submódulo
+   cogiendo el commit de shaeon/Lynx_MiSTer.
+2. Sube los submódulos (`rtl/lynx` y `rtl/lynx128`, los cores de Kyp) al
+   último commit de su repositorio, y su T80 a lo que fije ese commit.
 3. Quita de `releases/` todo RBF que no termine en `_ch96.rbf`.
-4. Sube el resultado y lanza la compilación (`build_ch96.yml`).
+4. Si ha cambiado algo en 1 o 2, sube el resultado y lanza la compilación
+   (`build_ch96.yml`). Si compila bien, el RBF nuevo queda en `releases/` y
+   el actualizador de la Chameleon96 lo recoge; si no, no se publica nada y el
+   error se ve en *Actions*.
 
 Si hay un conflicto en otro fichero (lo normal sería en `sys/`, si el
 framework de MiSTer cambia en el repositorio principal), el workflow para y el
